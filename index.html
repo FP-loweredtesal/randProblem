@@ -1,0 +1,504 @@
+
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="zh">
+<script>
+
+    function formatTime(time) {
+        const date = new Date(time);
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+    }
+
+    const PROFILE_API = '/duel/api/user/';
+    const AVATAR_API = '/duel/api/avatar/';
+
+    async function fetchAvatar(username, size = 100) {
+        try {
+            const response = await fetch(`${AVATAR_API}?user=${username}&size=${size}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Token ${UserToken}` // 将存储在 UserToken 变量中的 token 添加到请求头
+                }
+            });
+
+            const data = await response.json();
+            if (data && data.url) {
+                return data.url; // 如果返回了url，则返回该url
+            } else {
+                return null; // 如果没有返回有效的url，返回null
+            }
+        } catch (error) {
+            console.error('Failed to fetch avatar:', error);
+            return null; // 如果请求失败，返回null
+        }
+    }
+
+
+    async function fetchProfile(username) {
+        try {
+            const response = await fetch(`${PROFILE_API}${username}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Token ${UserToken}` // 将存储在 UserToken 变量中的 token 添加到请求头
+                }
+            });
+            if (response.status === 403) {
+                // 用户未授权，跳转到登录页面
+                window.location.href = '/duel/login';
+                return; // 阻止后续处理
+            }
+            if (!response.ok) {
+                throw new Error(`Failed to fetch profile for user: ${username}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching profile:', error);
+            return null; // 如果获取失败返回 null
+        }
+    }
+
+
+    const UserName = localStorage.getItem("userCPDuelSiteName")
+    const UserToken = localStorage.getItem("userCPDuelSiteToken")
+
+
+    function showDeskTopNotice(id, title, msg) {
+        var Notification = window.Notification || window.mozNotification || window.webkitNotification;
+        if (Notification) {
+            Notification.requestPermission(function (status) {
+                //status默认值'default'等同于拒绝 'denied' 意味着用户不想要通知 'granted' 意味着用户同意启用通知
+                if ("granted" != status) {
+                    return;
+                } else {
+                    var tag = "sds" + Math.random();
+                    var notify = new Notification(title, {
+                        dir: 'auto',
+                        lang: 'zh-CN',
+                        requireInteraction: true,
+                        tag: tag,//实例化的notification的id
+                        // icon:'/kfmanage/public/assets/images/index/workerman_logo.png',//通知的缩略图,//icon 支持ico、png、jpg、jpeg格式
+                        body: msg //通知的具体内容
+                    });
+                    notify.onclick = function () {
+                        //如果通知消息被点击,通知窗口将被激活
+                        window.focus();
+                        notify.close();
+                        //打开对应的界面
+                        // $("#v"+id+" .visit_content").trigger('click');
+                    },
+                        notify.onerror = function () {
+                            console.log("HTML5桌面消息出错！！！");
+                        };
+                    notify.onclose = function () {
+                        console.log("HTML5桌面消息关闭！！！");
+                    };
+                }
+            });
+        } else {
+            alert(msg);
+        }
+    };
+
+    function beep() {
+        var snd = new Audio("data:audio/wav;base64,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qJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=");
+        snd.play();
+    }
+</script>
+<head>
+
+    <link rel="stylesheet" href="/static/css/cfprofile.css">
+    <link rel="stylesheet" href="/static/css/profile.css">
+    <style>
+    .tag {
+      display: inline-block;
+      margin: 5px;
+      border-radius: 10px;
+    }
+    </style>
+
+    <script src='https://fp-loweredtesal.github.io/libs/js/jquery-3.2.1.min.js'></script>
+    <script src=/static/js/jquery.js></script>
+    <script src=/static/js/crypto_js.js></script>
+    <meta charset="UTF-8">
+    <title>CP Duels</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        function getUserRatingClass(rating) {
+            if (rating >= 3000) {
+                return 'user-legendary'; // 传奇用户
+            } else if (rating >= 2400) {
+                return 'user-fire'; // 火红
+            } else if (rating >= 2100) {
+                return 'user-orange'; // 橙色
+            } else if (rating >= 1900) {
+                return 'user-violet'; // 紫色
+            } else if (rating >= 1600) {
+                return 'user-blue'; // 蓝色
+            } else if (rating >= 1400) {
+                return 'user-cyan'; // 青色
+            } else if (rating >= 1200) {
+                return 'user-green'; // 绿色
+            } else {
+                return 'user-gray'; // 灰色
+            }
+        }
+
+        function renderUser(profile) {
+            const usernameLink = document.createElement('a');
+            usernameLink.href = `/duel/profile/${profile.user.username}/`;
+            usernameLink.textContent = profile.display_name;
+            if (profile.user.username === 'system')
+                usernameLink.className = 'user-admin'
+
+            else
+                usernameLink.className = getUserRatingClass(profile.rating); // 根据 Rating 分配颜色
+            usernameLink.classList.add('rated-user')
+            return usernameLink;
+        }
+        function renderUserFull(profile) {
+            const userDiv = document.createElement('span');
+            userDiv.appendChild(renderAvatar(profile))
+            userDiv.appendChild(renderUser(profile))
+            userDiv.classList.add('person')
+            return userDiv;
+        }
+        function renderProblem(problem) {
+            const problemLink = document.createElement('a');
+            problemLink.href = problem.link
+            problemLink.textContent = problem.name;
+            problemLink.className = getUserRatingClass(problem.rating); // 根据 Rating 分配颜色
+            problemLink.classList.add('rated-user')
+            return problemLink;
+        }
+
+        function logout() {
+            fetch('/duel/api/logout/', {
+                method: 'POST',
+                headers: {
+                    "Authorization": "Token " + UserToken
+                }
+            });
+            window.location.href = '/duel/login/';
+            localStorage.setItem('userCPDuelSiteToken', null)
+        }
+
+        function renderAvatar(profile) {
+            const avatar = document.createElement('img');
+            avatar.className = 'user_profile_small';
+            fetchAvatar(profile.user.username).then((avatarUrl) => {
+                avatar.src = avatarUrl || '/static/img/default.jpg';
+                ; // 如果没有头像，使用默认图像
+            });
+            return avatar
+        }
+
+        function renderMessageChain(message, container) {
+            console.log(message.sender.user)
+
+            let messageElement = document.createElement('div');
+            // 渲染发送者和时间
+            const header = document.createElement('span');
+            header.classList.add('message-time');
+            header.innerHTML = `${formatTime(message.time)} `;
+
+            const header1 = document.createElement('span');
+            header1.innerHTML = `: `;
+
+            messageElement.appendChild(header);
+            messageElement.appendChild(renderUser(message.sender))
+            messageElement.appendChild(header1);
+            message.message_chain.forEach(segment => {
+
+                messageElement.classList.add('message');
+
+
+                if (segment.type === 'user') {
+                    const user = segment.user;
+
+                    messageElement.appendChild(renderUser(user));
+
+                } else if (segment.type === 'plain') {
+                    // 纯文本消息
+                    const textElement = document.createElement('span');
+                    textElement.classList.add('plain-message');
+                    textElement.textContent = segment.text;
+                    textElement.style.color = segment.color || 'black'; // 默认颜色为黑色
+                    messageElement.appendChild(textElement);
+                }
+
+                // 添加到消息容器中
+                container.appendChild(messageElement);
+            });
+        }
+
+        function renderRating(profile) {
+            const ratingSpan = document.createElement('span');
+            ratingSpan.innerHTML = profile.rating;
+            ratingSpan.className = getUserRatingClass(profile.rating); // 根据 Rating 分配颜色
+            return ratingSpan;
+        }
+
+
+        function ex() {
+            document.getElementById("hint-box").style.display = "none";
+        }
+
+        function hint(text) {
+            box = document.getElementById("hint-box")
+
+            document.getElementById("hint").innerHTML = text
+            box.style.display = "block"
+        }
+    </script>
+</head>
+<body >
+<header>
+    <script>
+        var positive = [];
+    var negative = [];
+    </script>
+</header>
+<div class="main-container-box">
+    <div class="card">
+  <div> <span>题目 Rating 范围：</span> </div>
+  <span>
+    <input id='minimum' type="number" min="800" max="3500" step="100" value="800"> —
+    <input id='maximum' type="number" min="800" max="3500" step="100" value="3500">
+  </span>
+  <div id="positive"> <span>你想要的标签：</span> </div>
+  <select id="pos-select" onchange="add1()">
+    <option value=""></option>
+    <option value="2-sat" title="2-satisfiability">2-sat</option>
+    <option value="binary search" title="Binary search">binary search</option>
+    <option value="bitmasks" title="Bitmasks">bitmasks</option>
+    <option value="brute force" title="Brute force">brute force</option>
+    <option value="chinese remainder theorem" title="Сhinese remainder theorem">chinese remainder theorem</option>
+    <option value="combinatorics" title="Combinatorics">combinatorics</option>
+    <option value="constructive algorithms" title="Constructive algorithms">constructive algorithms</option>
+    <option value="data structures" title="Heaps, binary search trees, segment trees, hash tables, etc">data structures</option>
+    <option value="dfs and similar" title="Dfs and similar">dfs and similar</option>
+    <option value="divide and conquer" title="Divide and Conquer">divide and conquer</option>
+    <option value="dp" title="Dynamic programming">dp</option>
+    <option value="dsu" title="Disjoint set union">dsu</option>
+    <option value="expression parsing" title="Parsing expression grammar">expression parsing</option>
+    <option value="fft" title="Fast Fourier transform">fft</option>
+    <option value="flows" title="Graph network flows">flows</option>
+    <option value="games" title="Games, Sprague–Grundy theorem">games</option>
+    <option value="geometry" title="Geometry, computational geometry">geometry</option>
+    <option value="graph matchings" title="Graph matchings, König's theorem, vertex cover of bipartite graph">graph matchings</option>
+    <option value="graphs" title="Graphs">graphs</option>
+    <option value="greedy" title="Greedy algorithms">greedy</option>
+    <option value="hashing" title="Hashing, hashtables">hashing</option>
+    <option value="implementation" title="Implementation problems, programming technics, simulation">implementation</option>
+    <option value="interactive" title="Interactive problem">interactive</option>
+    <option value="math" title="Mathematics including integration, differential equations, etc">math</option>
+    <option value="matrices" title="Matrix multiplication, determinant, Cramer's rule, systems of linear equations">matrices</option>
+    <option value="meet-in-the-middle" title="Meet-in-the-middle">meet-in-the-middle</option>
+    <option value="number theory" title="Number theory: Euler function, GCD, divisibility, etc">number theory</option>
+    <option value="probabilities" title="Probabilities, expected values, statistics, random variables, etc">probabilities</option>
+    <option value="schedules" title="Scheduling Algorithms">schedules</option>
+    <option value="shortest paths" title="Shortest paths on weighted and unweighted graphs">shortest paths</option>
+    <option value="sortings" title="Sortings, orderings">sortings</option>
+    <option value="string suffix structures" title="Suffix arrays, suffix trees, suffix automatas, etc">string suffix structures</option>
+    <option value="strings" title="Prefix- and Z-functions, suffix structures, Knuth–Morris–Pratt algorithm, etc">strings</option>
+    <option value="ternary search" title="Ternary search">ternary search</option>
+    <option value="trees" title="Trees">trees</option>
+    <option value="two pointers" title="Two pointers">two pointers</option>
+    <!-- 省略部分选项 -->
+  </select>
+  <script>
+    function add1() {
+      let E = document.createElement('div');
+      E.className = 'tag';
+      E.style.setProperty('background-color', '#8ce196');
+      let tag = document.getElementById('pos-select').value;
+      document.getElementById('pos-select').value = '';
+      if (!tag || window.positive.includes(tag)) return;
+      window.positive.push(tag);
+      E.innerHTML = `<span style="margin: 10px">${tag}</span>`;
+      document.getElementById('positive').appendChild(E);
+    }
+    function add2() {
+      let E = document.createElement('div');
+      E.className = 'tag';
+      E.style.setProperty('background-color', 'palevioletred');
+      let tag = document.getElementById('neg-select').value;
+      document.getElementById('neg-select').value = '';
+      if (!tag || window.negative.includes(tag)) return;
+      window.negative.push(tag);
+      E.innerHTML = `<span style="margin: 10px">${tag}</span>`;
+      document.getElementById('negative').appendChild(E);
+    }
+  </script>
+  <div id="negative"> <span>不想要的标签：</span> </div>
+  <select id="neg-select" onchange="add2()">
+    <option value=""></option>
+    <option value="2-sat" title="2-satisfiability">2-sat</option>
+    <option value="binary search" title="Binary search">binary search</option>
+    <option value="bitmasks" title="Bitmasks">bitmasks</option>
+    <option value="brute force" title="Brute force">brute force</option>
+    <option value="chinese remainder theorem" title="Сhinese remainder theorem">chinese remainder theorem</option>
+    <option value="combinatorics" title="Combinatorics">combinatorics</option>
+    <option value="constructive algorithms" title="Constructive algorithms">constructive algorithms</option>
+    <option value="data structures" title="Heaps, binary search trees, segment trees, hash tables, etc">data structures</option>
+    <option value="dfs and similar" title="Dfs and similar">dfs and similar</option>
+    <option value="divide and conquer" title="Divide and Conquer">divide and conquer</option>
+    <option value="dp" title="Dynamic programming">dp</option>
+    <option value="dsu" title="Disjoint set union">dsu</option>
+    <option value="expression parsing" title="Parsing expression grammar">expression parsing</option>
+    <option value="fft" title="Fast Fourier transform">fft</option>
+    <option value="flows" title="Graph network flows">flows</option>
+    <option value="games" title="Games, Sprague–Grundy theorem">games</option>
+    <option value="geometry" title="Geometry, computational geometry">geometry</option>
+    <option value="graph matchings" title="Graph matchings, König's theorem, vertex cover of bipartite graph">graph matchings</option>
+    <option value="graphs" title="Graphs">graphs</option>
+    <option value="greedy" title="Greedy algorithms">greedy</option>
+    <option value="hashing" title="Hashing, hashtables">hashing</option>
+    <option value="implementation" title="Implementation problems, programming technics, simulation">implementation</option>
+    <option value="interactive" title="Interactive problem">interactive</option>
+    <option value="math" title="Mathematics including integration, differential equations, etc">math</option>
+    <option value="matrices" title="Matrix multiplication, determinant, Cramer's rule, systems of linear equations">matrices</option>
+    <option value="meet-in-the-middle" title="Meet-in-the-middle">meet-in-the-middle</option>
+    <option value="number theory" title="Number theory: Euler function, GCD, divisibility, etc">number theory</option>
+    <option value="probabilities" title="Probabilities, expected values, statistics, random variables, etc">probabilities</option>
+    <option value="schedules" title="Scheduling Algorithms">schedules</option>
+    <option value="shortest paths" title="Shortest paths on weighted and unweighted graphs">shortest paths</option>
+    <option value="sortings" title="Sortings, orderings">sortings</option>
+    <option value="string suffix structures" title="Suffix arrays, suffix trees, suffix automatas, etc">string suffix structures</option>
+    <option value="strings" title="Prefix- and Z-functions, suffix structures, Knuth–Morris–Pratt algorithm, etc">strings</option>
+    <option value="ternary search" title="Ternary search">ternary search</option>
+    <option value="trees" title="Trees">trees</option>
+    <option value="two pointers" title="Two pointers">two pointers</option>
+    <!-- 省略部分选项 -->
+  </select>
+        <br>
+  <button id="fetch-problem" style="margin: 10px">随机跳题</button>
+  <div id="problem-display" style="margin-top: 20px;"></div>
+</div>
+
+<script>
+  function randomNum(minNum,maxNum){
+      const a = Math.floor(Math.random() * (maxNum - minNum + 1)) + minNum;
+      return a;
+  }
+  function check(requirements, prob) {
+    var res = true;
+    // console.log(prob);
+    if (prob.rating < requirements.L || prob.rating > requirements.R) {
+      // console.log("not diff");
+      return false;
+    }
+    var m = requirements.tags.length;
+    var k = prob.tags.length;
+    var flg = false;
+    for (var i = 0; i < m; i ++) {
+      flg = false;
+      for (var j = 0; j < k; j ++) {
+        if (prob.tags[j] == requirements.tags[i])
+          flg = true;
+      }
+      if (flg == false) {
+        return false;
+      }
+    }
+    m = requirements.ban.length;
+    for (i = 0; i < m; i ++) {
+      flg = true;
+      for (j = 0; j < k; j ++) {
+        if (prob.tags[j] == requirements.ban[i])
+          flg = false;
+      }
+      if (flg == false) {
+        // console.log("ban");
+        return false;
+      }
+    }
+    // console.log("alive");
+    return true;
+  }
+  document.getElementById('fetch-problem').addEventListener('click', async () => {
+    const L = parseInt(document.getElementById('minimum').value);
+    const R = parseInt(document.getElementById('maximum').value);
+    const tags = [...window.positive];
+    const ban = [...window.negative];
+
+    const requirements = {
+      L,
+      R,
+      diff: true,
+      tags,
+      ban
+    };
+    console.log(requirements);
+    $.get("https://codeforces.com/api/problemset.problems", function (problemList) {
+      var lst = [];
+      var problems = problemList.result.problems;
+      console.log(requirements);
+      for (var i = 0; i < problems.length; i ++) {
+        if (check(requirements, problems[i])) {
+          lst.push(i);
+          // console.log(i);
+        }
+      }
+      if (lst.length == 0) {
+        const display = document.getElementById('problem-display');
+        display.innerHTML = "No such Problem!";
+        throw new Error(`Error: No such problem`);
+      } else {
+        var wjc = problems[lst[randomNum(0, lst.length - 1)]];
+        console.log(wjc);
+        displayProblem(wjc);
+      }
+    });
+    // $.get("https://codeforces.com/api/problemset.problems?tags=implementation")
+    // console.log(requirements);
+    // try {
+    //   const response = await fetch('/duel/api/randprob/', {
+    //     method: 'POST',
+    //     headers: {
+    //       'Content-Type': 'application/json'
+    //     },
+    //     body: JSON.stringify({ requirements })
+    //   });
+
+    //   if (!response.ok) {
+    //     throw new Error(`Error: ${response.statusText}`);
+    //   }
+
+
+    //   const problem = await response.json();
+
+    //     if (problem.code === 404) {
+    //     throw new Error(`Error: No such problem`);
+    //   }
+    //   displayProblem(problem.data);
+    // } catch (error) {
+    //   document.getElementById('problem-display').innerHTML = `<p style="color: red;">${error.message}</p>`;
+    // }
+  });
+
+  function displayProblem(problem) {
+    const display = document.getElementById('problem-display');
+    display.innerHTML = `Go:${problem.contestId}${problem.index}`;
+  }
+</script>
+</div>
+</body>
+<script>
+    window.addEventListener('resize', () => {
+        const footer = document.querySelector('footer');
+        footer.style.bottom = 0;
+
+    })
+    document.querySelectorAll('.show-when-logged-in').forEach(div => {
+        div.style.display = UserToken ? 'block' : 'none';
+    });
+
+    document.querySelectorAll('.show-when-logged-out').forEach(div => {
+        div.style.display = UserToken ? 'none' : 'block';
+    });
+</script>
+</html>
